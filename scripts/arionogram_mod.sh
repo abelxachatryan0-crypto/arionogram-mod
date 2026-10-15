@@ -44,9 +44,9 @@ from pathlib import Path
 p = Path("TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java")
 s = p.read_text()
 
-# Добавляем стандартную кнопку через UItem.asButton (совместимо с официальным TG)
+# Используем безопасный метод UItem.asCell для добавления пункта в настройки
 button_anchor = '        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));'
-button = '''        items.add(UItem.asButton(26, R.drawable.msg_settings, "Настройки мода", "Arionogram • Дополнительные функции"));
+button = '''        items.add(UItem.asCell(26, "Настройки мода", "Arionogram • Дополнительные функции"));
         items.add(UItem.asShadow(null));
 '''
 
