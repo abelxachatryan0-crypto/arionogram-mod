@@ -44,12 +44,9 @@ from pathlib import Path
 p = Path("TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java")
 s = p.read_text()
 
-# Add the actual button to the Settings screen.
+# Добавляем стандартную кнопку через UItem.asButton (совместимо с официальным TG)
 button_anchor = '        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));'
-button = '''        items.add(SettingCell.Factory.of(
-            26, 0xFF4388FF, 0xFF7B61FF, 0,
-            "Настройки мода", "Arionogram • Дополнительные функции"
-        ));
+button = '''        items.add(UItem.asButton(26, R.drawable.msg_settings, "Настройки мода", "Arionogram • Дополнительные функции"));
         items.add(UItem.asShadow(null));
 '''
 
@@ -58,7 +55,7 @@ if '"Настройки мода"' not in s:
         raise SystemExit("ERROR: Settings list anchor not found; no changes made.")
     s = s.replace(button_anchor, button + button_anchor, 1)
 
-# Add the button's click action.
+# Добавляем обработчик нажатия на кнопку
 case_anchor = '        switch (item.id) {'
 case_code = '''        switch (item.id) {
             case 26: {
