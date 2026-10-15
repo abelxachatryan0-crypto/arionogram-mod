@@ -42,26 +42,32 @@ python3 - <<'PY'
 import re
 from pathlib import Path
 
-# 1. Полностью удаляем строчку с google-services, чтобы Gradle не требовал файл конфигурации для .beta пакета
+# 1. Удаляем google-services
 app_gradle = Path("TMessagesProj_App/build.gradle")
 if app_gradle.exists():
     content = app_gradle.read_text()
     content = re.sub(r'^.*google-services.*$', '', content, flags=re.MULTILINE)
     app_gradle.write_text(content)
 
-# 2. Добавляем пункт в настройки SettingsActivity
+# 2. Добавляем пункт в настройки через универсальный UItem
 p = Path("TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java")
 s = p.read_text()
 
 button_anchor = '        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));'
-button = '''        items.add(UItem.asCell(26, "Настройки мода", "Arionogram • Дополнительные функции"));
+# Используем универсальный UItem.asButton без сложной сигнатуры asCell
+button = '''        items.add(UItem.asButton(26, "Настройки мода", "Arionogram • Дополнительные функции"));
         items.add(UItem.asShadow(null));
 '''
 
 if '"Настройки мода"' not in s:
     if button_anchor not in s:
-        raise SystemExit("ERROR: Settings list anchor not found; no changes made.")
-    s = s.replace(button_anchor, button + button_anchor, 1)
+        # Резервный поиск якоря, если структура списка чуть изменилась
+        button_anchor = 'items.add(UItem.asHeader('
+        if button_anchor not in s:
+            raise SystemExit("ERROR: Settings list anchor not found.")
+        s = s.replace(button_anchor, button + button_anchor, 1)
+    else:
+        s = s.replace(button_anchor, button + button_anchor, 1)
 
 # Добавляем обработчик нажатия
 case_anchor = '        switch (item.id) {'
@@ -108,11 +114,11 @@ case_code = '''        switch (item.id) {
 
 if 'case 26: {' not in s:
     if case_anchor not in s:
-        raise SystemExit("ERROR: Click handler not found; no changes made.")
+        raise SystemExit("ERROR: Click handler not found.")
     s = s.replace(case_anchor, case_code, 1)
 
 p.write_text(s)
-print("OK: Arionogram mod button and google-services removal applied.")
+print("OK: Arionogram mod button fixed and applied.")
 PY
 
 echo "Arionogram patch completed."
