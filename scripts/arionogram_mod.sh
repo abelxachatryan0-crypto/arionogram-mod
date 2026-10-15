@@ -39,14 +39,14 @@ cat > "$RES/arionogram_button_press.xml" <<'XML'
 XML
 
 python3 - <<'PY'
+import re
 from pathlib import Path
 
-# 1. Отключаем проверку Google Services, чтобы пакет com.arionogram.app.beta не вызывал ошибку
+# 1. Полностью удаляем строчку с google-services из build.gradle, чтобы Gradle не ругался
 app_gradle = Path("TMessagesProj_App/build.gradle")
 if app_gradle.exists():
     content = app_gradle.read_text()
-    # Закомментируем плагин google-services, если он там есть
-    content = content.replace("com.google.gms.google-services", "// com.google.gms.google-services")
+    content = re.sub(r'^.*google-services.*$', '', content, flags=re.MULTILINE)
     app_gradle.write_text(content)
 
 # 2. Добавляем пункт в настройки SettingsActivity
@@ -112,7 +112,7 @@ if 'case 26: {' not in s:
     s = s.replace(case_anchor, case_code, 1)
 
 p.write_text(s)
-print("OK: Arionogram mod button and google-services bypass applied.")
+print("OK: Arionogram mod button and google-services removal applied.")
 PY
 
 echo "Arionogram patch completed."
