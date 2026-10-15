@@ -1,44 +1,97 @@
-name: Build
+name: Build Arionogram
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
-      - name: Download source
+      - name: Download source code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup Java
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
           cache: gradle
 
-      - name: Insert API keys
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Insert Telegram API keys
         env:
           AID: ${{ secrets.API_ID }}
           AHASH: ${{ secrets.API_HASH }}
+        shell: bash
         run: |
-          set -e
-          F=TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          set -euo pipefail
 
-          sed -i "s/APP_ID = [0-9]*;/APP_ID = $AID;/" "$F"
-          sed -i "s/APP_HASH = \"[^\"]*\";/APP_HASH = \"$AHASH\";/" "$F"
+          FILE="TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java"
 
-      - name: Rebrand
+          if [[ -z "${AID:-}" || -z "${AHASH:-}" ]]; then
+            echo "ERROR: Add API_ID and API_HASH in GitHub repository secrets."
+            exit 1
+          fi
+
+          if [[ ! -f "$FILE" ]]; then
+            echo "ERROR: BuildVars.java not found."
+            exit 1
+          fi
+
+          export AID AHASH
+
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          p = Path("TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java")
+          s = p.read_text()
+
+          s, n1 = re.subn(
+              r'(\bAPP_ID\s*=\s*)\d+(\s*;)',
+              lambda m: m.group(1) + os.environ["AID"] + m.group(2),
+              s,
+              count=1
+          )
+
+          s, n2 = re.subn(
+              r'(\bAPP_HASH\s*=\s*)"[a-fA-F0-9]*"(\s*;)',
+              lambda m: m.group(1) + '"' + os.environ["AHASH"] + '"' + m.group(2),
+              s,
+              count=1
+          )
+
+          if n1 != 1 or n2 != 1:
+              raise SystemExit(
+                  "ERROR: Could not safely update APP_ID / APP_HASH. "
+                  "Check the variable declarations in BuildVars.java."
+              )
+
+          p.write_text(s)
+          print("Telegram API credentials inserted.")
+          PY
+
+      - name: Rebrand Arionogram
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          sed -i 's/^APP_PACKAGE *=.*/APP_PACKAGE=com.arionogram.app/' gradle.properties
-
-          sed -i "s|^apply plugin: 'com.google.gms.google-services'|// &|" \
-            TMessagesProj_App/build.gradle
+          if [[ -f gradle.properties ]]; then
+            sed -i 's/^APP_PACKAGE=.*/APP_PACKAGE=com.arionogram.app/' gradle.properties
+          fi
 
           find TMessagesProj/src/main/res TMessagesProj_App/src \
             -type f -name '*.xml' -print0 2>/dev/null |
@@ -47,23 +100,37 @@ jobs:
               -e 's/>Telegram</>Arionogram</g'
 
       - name: Apply Arionogram mod changes
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
+          if [[ ! -f scripts/arionogram_mod.sh ]]; then
+            echo "ERROR: scripts/arionogram_mod.sh not found."
+            exit 1
+          fi
+
           chmod +x scripts/arionogram_mod.sh
           ./scripts/arionogram_mod.sh
 
-      - name: Accept Android SDK licenses
+      - name: Build Arionogram APK
+        shell: bash
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          set -euo pipefail
 
-      - name: Build APK
-        run: |
           chmod +x gradlew
-          ./gradlew :TMessagesProj_App:assembleAfatDebug
+
+          yes | sdkmanager --licenses || true
+
+          ./gradlew :TMessagesProj_App:assembleAfatDebug \
+            --no-daemon \
+            --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: arionogram-apk
-          path: "**/*.apk"
+          path: |
+            TMessagesProj_App/build/outputs/apk/**/*.apk
+            TMessagesProj/build/outputs/apk/**/*.apk
           if-no-files-found: error
+          retention-days: 7
