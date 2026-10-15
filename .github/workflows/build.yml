@@ -24,33 +24,17 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK Manually
+      - name: Set up Android SDK & local.properties
         shell: bash
         run: |
           set -euo pipefail
           
-          echo "Setting up Android SDK..."
-          mkdir -p $HOME/android-sdk/cmdline-tools
+          # Используем стандартный SDK, который уже есть на GitHub-раннере
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           
-          # Скачиваем официальные commandlinetools для Linux
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-          rm cmdline-tools.zip
-          
-          # Настраиваем переменные окружения
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
-
-      - name: Accept Android SDK licenses & Install components
-        shell: bash
-        run: |
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-          
+          # Принимаем лицензии
+          export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Insert Telegram API keys
         env:
@@ -138,13 +122,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-
+          
           chmod +x gradlew
-
-          yes | sdkmanager --licenses || true
-
+          
+          # Собираем проект (используя встроенный SDK и local.properties)
           ./gradlew :TMessagesProj_App:assembleAfatDebug \
             --no-daemon \
             --stacktrace
@@ -156,6 +137,6 @@ jobs:
           path: |
             TMessagesProj_App/build/outputs/apk/**/*.apk
             TMessagesProj/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+          if-no-found: error
           retention-days: 7
           
