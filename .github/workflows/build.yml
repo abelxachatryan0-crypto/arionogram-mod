@@ -22,17 +22,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+
+      # Официальный умный кэш Gradle (сохраняет зависимости и нативные сборки CMake/NDK)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Set up Android SDK & local.properties
         shell: bash
         run: |
           set -euo pipefail
           
-          # Используем стандартный SDK, который уже есть на GitHub-раннере
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           
-          # Принимаем лицензии
           export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
           yes | sdkmanager --licenses || true
 
@@ -125,9 +126,9 @@ jobs:
           
           chmod +x gradlew
           
-          # Собираем проект (используя встроенный SDK и local.properties)
           ./gradlew :TMessagesProj_App:assembleAfatDebug \
             --no-daemon \
+            --build-cache \
             --stacktrace
 
       - name: Upload APK
@@ -137,6 +138,6 @@ jobs:
           path: |
             TMessagesProj_App/build/outputs/apk/**/*.apk
             TMessagesProj/build/outputs/apk/**/*.apk
-          if-no-found: error
+          if-no-files-found: error
           retention-days: 7
           
