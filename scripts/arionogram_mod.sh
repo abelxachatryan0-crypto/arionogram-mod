@@ -42,7 +42,7 @@ python3 - <<'PY'
 import re
 from pathlib import Path
 
-# 1. Полностью удаляем строчку с google-services из build.gradle, чтобы Gradle не ругался
+# 1. Полностью удаляем строчку с google-services, чтобы Gradle не требовал файл конфигурации для .beta пакета
 app_gradle = Path("TMessagesProj_App/build.gradle")
 if app_gradle.exists():
     content = app_gradle.read_text()
