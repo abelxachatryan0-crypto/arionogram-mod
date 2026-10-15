@@ -41,10 +41,18 @@ XML
 python3 - <<'PY'
 from pathlib import Path
 
+# 1. Отключаем проверку Google Services, чтобы пакет com.arionogram.app.beta не вызывал ошибку
+app_gradle = Path("TMessagesProj_App/build.gradle")
+if app_gradle.exists():
+    content = app_gradle.read_text()
+    # Закомментируем плагин google-services, если он там есть
+    content = content.replace("com.google.gms.google-services", "// com.google.gms.google-services")
+    app_gradle.write_text(content)
+
+# 2. Добавляем пункт в настройки SettingsActivity
 p = Path("TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java")
 s = p.read_text()
 
-# Используем безопасный метод UItem.asCell для добавления пункта в настройки
 button_anchor = '        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));'
 button = '''        items.add(UItem.asCell(26, "Настройки мода", "Arionogram • Дополнительные функции"));
         items.add(UItem.asShadow(null));
@@ -55,7 +63,7 @@ if '"Настройки мода"' not in s:
         raise SystemExit("ERROR: Settings list anchor not found; no changes made.")
     s = s.replace(button_anchor, button + button_anchor, 1)
 
-# Добавляем обработчик нажатия на кнопку
+# Добавляем обработчик нажатия
 case_anchor = '        switch (item.id) {'
 case_code = '''        switch (item.id) {
             case 26: {
@@ -104,7 +112,7 @@ if 'case 26: {' not in s:
     s = s.replace(case_anchor, case_code, 1)
 
 p.write_text(s)
-print("OK: Arionogram mod button and settings added.")
+print("OK: Arionogram mod button and google-services bypass applied.")
 PY
 
 echo "Arionogram patch completed."
