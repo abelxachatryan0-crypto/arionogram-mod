@@ -24,11 +24,14 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
+      - name: Set up Android SDK & Accept Licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          # Устанавливаем необходимые компоненты SDK без зависаний
+          sdkmanager --install "platforms;android-33" "build-tools;33.0.2" "platform-tools"
+          yes | sdkmanager --licenses || true
 
       - name: Insert Telegram API keys
         env:
@@ -134,3 +137,4 @@ jobs:
             TMessagesProj/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
+          
