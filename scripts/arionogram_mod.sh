@@ -11,17 +11,31 @@ test -f "$SETTINGS_FILE" || {
     exit 1
 }
 
-# 1. Меняем надпись Telegram на Arionogram вверху экрана
+# 1. Отключаем google-services плагин в Gradle, чтобы предотвратить ошибку 'processAfatDebugGoogleServices'
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+app_gradle = Path("TMessagesProj_App/build.gradle")
+if app_gradle.exists():
+    content = app_gradle.read_text()
+    content = re.sub(r"^.*google-services.*$", "", content, flags=re.MULTILINE)
+    content = re.sub(r"^.*apply plugin: 'com.google.gms.google-services'.*$", "", content, flags=re.MULTILINE)
+    app_gradle.write_text(content)
+    print("OK: Removed google-services plugin from TMessagesProj_App/build.gradle")
+PY
+
+# 2. Меняем заголовок "Telegram" в ресурсах приложения на "Arionogram"
 find TMessagesProj/src/main/res TMessagesProj_App/src \
   -type f -name 'strings.xml' -print0 2>/dev/null |
   xargs -0 -r sed -i \
     -e 's/<string name="AppName">Telegram<\/string>/<string name="AppName">Arionogram<\/string>/g' \
     -e 's/>Telegram</>Arionogram</g' || true
 
-# 2. Создаем изолированную папку для настроек мода
+# 3. Создаем папку мода
 mkdir -p "$MOD_DIR"
 
-# 3. Создаем экран с 3 функциями (Liquid Glass, Jelly Animations, Select theme color)
+# 4. Создаем экран ArionogramSettingsActivity.java со свойствами мода
 cat > "$MOD_DIR/ArionogramSettingsActivity.java" <<'JAVA'
 package org.telegram.ui.Arionogram;
 
@@ -226,7 +240,7 @@ public class ArionogramSettingsActivity extends BaseFragment {
 }
 JAVA
 
-# 4. Добавляем аккуратно пункт "Настройки мода" в список настроек Telegram
+# 5. Подключаем пункт "Настройки мода" в SettingsActivity.java
 python3 - <<'PY'
 from pathlib import Path
 
@@ -260,7 +274,7 @@ if f'case {MOD_ID}: {{' not in s:
     s = s.replace(case_anchor, case_code, 1)
 
 settings_file.write_text(s)
-print("OK: Success")
+print("OK: Integrated into SettingsActivity successfully.")
 PY
 
-echo "Script finished."
+echo "Script execution finished."
