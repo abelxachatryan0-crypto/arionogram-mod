@@ -1,121 +1,29 @@
 name: Build Arionogram
 
 on:
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
 
     steps:
-      - name: Download source code
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Set up Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'zulu'
           java-version: '17'
 
-      # Официальный умный кэш Gradle (сохраняет зависимости и нативные сборки CMake/NDK)
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Set up Android SDK & local.properties
-        shell: bash
+      - name: Run Arionogram Mod Script
         run: |
-          set -euo pipefail
-          
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          
-          export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
-          yes | sdkmanager --licenses || true
-
-      - name: Insert Telegram API keys
-        env:
-          AID: ${{ secrets.API_ID }}
-          AHASH: ${{ secrets.API_HASH }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          FILE="TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java"
-
-          if [[ -z "${AID:-}" || -z "${AHASH:-}" ]]; then
-            echo "ERROR: Add API_ID and API_HASH in GitHub repository secrets."
-            exit 1
-          fi
-
-          if [[ ! -f "$FILE" ]]; then
-            echo "ERROR: BuildVars.java not found."
-            exit 1
-          fi
-
-          export AID AHASH
-
-          python3 - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          p = Path("TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java")
-          s = p.read_text()
-
-          s, n1 = re.subn(
-              r'(\bAPP_ID\s*=\s*)\d+(\s*;)',
-              lambda m: m.group(1) + os.environ["AID"] + m.group(2),
-              s,
-              count=1
-          )
-
-          s, n2 = re.subn(
-              r'(\bAPP_HASH\s*=\s*)"[a-fA-F0-9]*"(\s*;)',
-              lambda m: m.group(1) + '"' + os.environ["AHASH"] + '"' + m.group(2),
-              s,
-              count=1
-          )
-
-          if n1 != 1 or n2 != 1:
-              raise SystemExit(
-                  "ERROR: Could not safely update APP_ID / APP_HASH. "
-                  "Check the variable declarations in BuildVars.java."
-              )
-
-          p.write_text(s)
-          print("Telegram API credentials inserted.")
-          PY
-
-      - name: Rebrand Arionogram
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ -f gradle.properties ]]; then
-            sed -i 's/^APP_PACKAGE=.*/APP_PACKAGE=com.arionogram.app/' gradle.properties
-          fi
-
-          find TMessagesProj/src/main/res TMessagesProj_App/src \
-            -type f -name '*.xml' -print0 2>/dev/null |
-            xargs -0 -r sed -i \
-              -e 's/Telegram Beta/Arionogram/g' \
-              -e 's/>Telegram</>Arionogram</g'
-
-      - name: Apply Arionogram mod changes
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ ! -f scripts/arionogram_mod.sh ]]; then
-            echo "ERROR: scripts/arionogram_mod.sh not found."
-            exit 1
-          fi
-
           chmod +x scripts/arionogram_mod.sh
           ./scripts/arionogram_mod.sh
 
@@ -123,21 +31,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
           chmod +x gradlew
-          
           ./gradlew :TMessagesProj_App:assembleAfatDebug \
+            -x processAfatDebugGoogleServices \
+            -x processAfatReleaseGoogleServices \
             --no-daemon \
             --build-cache \
             --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arionogram-apk
-          path: |
-            TMessagesProj_App/build/outputs/apk/**/*.apk
-            TMessagesProj/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-          retention-days: 7
+          name: Arionogram-APK
+          path: TMessagesProj_App/build/outputs/apk/afat/debug/*.apk
           
